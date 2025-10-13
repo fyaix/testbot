@@ -1,0 +1,27 @@
+-- Tabel Users
+CREATE TABLE users (
+    id BIGINT PRIMARY KEY,
+    username TEXT,
+    status TEXT DEFAULT 'idle', -- idle, searching, chatting
+    partner_id BIGINT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Tabel Sessions (untuk log chat)
+CREATE TABLE sessions (
+    id SERIAL PRIMARY KEY,
+    user1_id BIGINT REFERENCES users(id),
+    user2_id BIGINT REFERENCES users(id),
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    ended_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Tabel Reports
+CREATE TABLE reports (
+    id SERIAL PRIMARY KEY,
+    reporter_id BIGINT REFERENCES users(id),
+    reported_id BIGINT REFERENCES users(id),
+    reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
