@@ -127,7 +127,7 @@ def main() -> None:
 
     # General message handler (must be last)
     application.add_handler(MessageHandler(
-        filters.TEXT | filters.PHOTO | filters.VIDEO | filters.VOICE | filters.STICKER,
+        filters.TEXT | filters.PHOTO | filters.VIDEO | filters.VOICE | filters.Sticker,
         decorated_forward_message
     ))
 
