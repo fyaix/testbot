@@ -3,8 +3,8 @@ from config import GENDERS, HOBBIES, REPORT_REASONS
 
 # --- Reply Keyboards ---
 MAIN_MENU = ReplyKeyboardMarkup([
-    [KeyboardButton("🔍 Find Partner"), KeyboardButton("✨ Search Pro")],
-    [KeyboardButton("👤 My Profile"), KeyboardButton("💎 Upgrade to Pro")],
+    [KeyboardButton("🔍 Find Partner"), KeyboardButton("✨ Pro Search")],
+    [KeyboardButton("👤 My Profile"), KeyboardButton("💎 Upgrade")],
     [KeyboardButton("🎮 Play Quiz"), KeyboardButton("👥 Join Group")],
 ], resize_keyboard=True)
 

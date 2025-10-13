@@ -6,9 +6,16 @@ from .keyboards import MAIN_MENU, GENDER_KEYBOARD, HOBBY_KEYBOARD
 
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Starts the profile setup conversation."""
-    await update.message.reply_text(
-        "Let's set up your profile!\n\n"
-        "First, what's your gender?",
+    # Check if called from a button press
+    if update.callback_query:
+        await update.callback_query.answer()
+        message = update.callback_query.message
+    else:
+        message = update.message
+
+    await message.reply_text(
+        "mari kita atur profilmu!\n\n"
+        "Pertama, apa jenis kelaminmu?",
         reply_markup=GENDER_KEYBOARD
     )
     return states["PROFILE_GENDER"]
@@ -17,11 +24,11 @@ async def gender_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the gender input."""
     gender = update.message.text
     if gender not in GENDERS:
-        await update.message.reply_text("Invalid gender. Please choose from the options.", reply_markup=GENDER_KEYBOARD)
+        await update.message.reply_text("Pilihan tidak valid. Silakan pilih dari opsi yang diberikan.", reply_markup=GENDER_KEYBOARD)
         return states["PROFILE_GENDER"]
 
     context.user_data['profile_data'] = {'gender': gender}
-    await update.message.reply_text("Got it. How old are you?")
+    await update.message.reply_text("Sip. Berapa usiamu?")
     return states["PROFILE_AGE"]
 
 async def age_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -31,22 +38,22 @@ async def age_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not 13 <= age <= 99:
             raise ValueError
     except ValueError:
-        await update.message.reply_text("Please enter a valid age (e.g., 25).")
+        await update.message.reply_text("Harap masukkan usia yang valid (misalnya, 25).")
         return states["PROFILE_AGE"]
 
     context.user_data['profile_data']['age'] = age
-    await update.message.reply_text("Great. Now, write a short bio about yourself.")
+    await update.message.reply_text("Oke. Sekarang, tulis bio singkat tentang dirimu (misal: hobi, minat, dll).")
     return states["PROFILE_BIO"]
 
 async def bio_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the bio input."""
     bio = update.message.text
     if len(bio) < 10:
-        await update.message.reply_text("Your bio is too short. Please write a bit more.")
+        await update.message.reply_text("Bio Anda terlalu pendek. Coba tulis sedikit lebih banyak ya.")
         return states["PROFILE_BIO"]
 
     context.user_data['profile_data']['bio'] = bio
-    await update.message.reply_text("Looking good! Now, please send a profile photo.")
+    await update.message.reply_text("Keren! Sekarang, silakan kirim foto profil terbaikmu.")
     return states["PROFILE_PHOTO"]
 
 async def photo_step(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -52,7 +52,10 @@ def main() -> None:
 
     # --- Conversation Handlers ---
     profile_conv = ConversationHandler(
-        entry_points=[CommandHandler("profile", profile_command)],
+        entry_points=[
+            CommandHandler("profile", profile_command),
+            MessageHandler(filters.Regex(r"^👤 My Profile$"), profile_command)
+        ],
         states={
             states["PROFILE_GENDER"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, gender_step)],
             states["PROFILE_AGE"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, age_step)],
@@ -64,35 +67,41 @@ def main() -> None:
     )
 
     search_pro_conv = ConversationHandler(
-        entry_points=[CommandHandler("searchpro", search_pro_command)],
+        entry_points=[
+            CommandHandler("searchpro", search_pro_command),
+            MessageHandler(filters.Regex(r"^✨ Pro Search$"), search_pro_command)
+        ],
         states={
-            states["SEARCH_GENDER"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, search_gender_step)],
-            states["SEARCH_HOBBY"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, search_hobby_step)],
-            states["SEARCH_AGE_MIN"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, search_age_min_step)],
-            states["SEARCH_AGE_MAX"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, search_age_max_step)],
+            states["SEARCH_GENDER"]: [CallbackQueryHandler(search_gender_step, pattern=r"^searchgender_")],
+            states["SEARCH_HOBBY"]: [CallbackQueryHandler(search_hobby_step, pattern=r"^searchhobby_")],
+            states["SEARCH_AGE_MIN"]: [MessageHandler(filters.Regex(r'^\d{1,2}\s*-\s*\d{1,2}$'), search_age_range_step)],
         },
         fallbacks=[CommandHandler("cancel", cancel_profile)], # Can reuse cancel
     )
 
     # --- Registering Handlers ---
+    # Conversation Handlers must be registered before the buttons that trigger them
     application.add_handler(profile_conv)
     application.add_handler(search_pro_conv)
 
-    # Basic commands
+    # Basic commands for direct access
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
 
-    # Matching commands
-    application.add_handler(CommandHandler("find", find_partner_command))
+    # Button-based commands (using Regex)
+    application.add_handler(MessageHandler(filters.Regex(r"^🔍 Find Partner$"), find_partner_command))
+    application.add_handler(MessageHandler(filters.Regex(r"^✨ Pro Search$"), search_pro_command))
+    application.add_handler(MessageHandler(filters.Regex(r"^👤 My Profile$"), profile_command))
+    application.add_handler(MessageHandler(filters.Regex(r"^💎 Upgrade$"), upgrade_command))
+    application.add_handler(MessageHandler(filters.Regex(r"^🎮 Play Quiz$"), play_quiz_command))
+    # Note: Group join is not implemented yet, so we'll skip that button for now.
+
+    # Text-based commands that are still necessary
     application.add_handler(CommandHandler("next", next_command))
     application.add_handler(CommandHandler("stop", stop_command))
-
-    # Feature commands
-    application.add_handler(CommandHandler("playquiz", play_quiz_command))
     application.add_handler(CommandHandler("answer", answer_quiz_command))
     application.add_handler(CommandHandler("report", report_command))
     application.add_handler(CommandHandler("feedback", feedback_command))
-    application.add_handler(CommandHandler("upgrade", upgrade_command))
     application.add_handler(CommandHandler("secretmode", secret_mode_command))
     
     # Admin commands
@@ -103,7 +112,7 @@ def main() -> None:
     application.add_handler(CommandHandler("adminstats", admin_stats_command))
 
     # Callback Query Handlers
-    application.add_handler(CallbackQueryHandler(skip_profile_callback, pattern="^skip_profile$"))
+    application.add_handler(CallbackQueryHandler(profile_command, pattern="^start_profile_setup$"))
     application.add_handler(CallbackQueryHandler(report_callback, pattern=r"^(report_|block_)"))
     application.add_handler(CallbackQueryHandler(fb_callback, pattern=r"^fb_"))
     application.add_handler(CallbackQueryHandler(quiz_reward_callback, pattern=r"^quiz(pro|poin)_"))

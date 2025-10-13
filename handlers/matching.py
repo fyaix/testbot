@@ -24,7 +24,7 @@ async def find_partner_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # --- Pro Search Conversation ---
 async def search_pro_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Starts the pro search conversation."""
+    """Starts the Pro Search conversation with inline buttons."""
     user_id = update.effective_user.id
     if not db.is_pro(user_id):
         await update.message.reply_text("🚫 This is a Pro feature. /upgrade to get access.", reply_markup=MAIN_MENU)
@@ -34,38 +34,57 @@ async def search_pro_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("Your profile is incomplete. Please use /profile first.", reply_markup=MAIN_MENU)
         return ConversationHandler.END
 
-    await update.message.reply_text("What gender are you looking for?", reply_markup=GENDER_KEYBOARD)
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(gender, callback_data=f"searchgender_{gender}") for gender in GENDERS],
+        [InlineKeyboardButton("Any Gender", callback_data="searchgender_Any")]
+    ])
+    await update.message.reply_text("Please select your preferred partner gender:", reply_markup=keyboard)
     return states["SEARCH_GENDER"]
 
 async def search_gender_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the gender preference for pro search."""
-    context.user_data['search_prefs'] = {'gender_pref': update.message.text}
-    await update.message.reply_text("What hobby are you looking for?", reply_markup=HOBBY_KEYBOARD)
+    """Handles the gender preference from the inline keyboard."""
+    query = update.callback_query
+    await query.answer()
+
+    gender_pref = query.data.split('_')[1]
+    context.user_data['search_prefs'] = {'gender_pref': gender_pref if gender_pref != "Any" else None}
+
+    # Now ask for hobby
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(hobby, callback_data=f"searchhobby_{hobby}") for hobby in HOBBIES[:5]],
+        [InlineKeyboardButton(hobby, callback_data=f"searchhobby_{hobby}") for hobby in HOBBIES[5:]],
+        [InlineKeyboardButton("Any Hobby", callback_data="searchhobby_Any")]
+    ])
+    await query.edit_message_text("Now, select your preferred partner hobby:", reply_markup=keyboard)
     return states["SEARCH_HOBBY"]
 
 async def search_hobby_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the hobby preference for pro search."""
-    context.user_data['search_prefs']['hobby_pref'] = update.message.text
-    await update.message.reply_text("Enter the minimum age for your partner (e.g., 18).")
-    return states["SEARCH_AGE_MIN"]
+    """Handles the hobby preference from the inline keyboard."""
+    query = update.callback_query
+    await query.answer()
 
-async def search_age_min_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the minimum age preference."""
-    try:
-        context.user_data['search_prefs']['age_min'] = int(update.message.text)
-    except ValueError:
-        await update.message.reply_text("Please enter a valid number for age.")
-        return states["SEARCH_AGE_MIN"]
-    await update.message.reply_text("Enter the maximum age for your partner (e.g., 30).")
-    return states["SEARCH_AGE_MAX"]
+    hobby_pref = query.data.split('_')[1]
+    context.user_data['search_prefs']['hobby_pref'] = hobby_pref if hobby_pref != "Any" else None
 
-async def search_age_max_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles max age and executes the pro search."""
+    await query.edit_message_text("Great. Now, please send the desired age range for your partner.\n\nFormat: `min-max` (e.g., `18-25`)")
+    return states["SEARCH_AGE_MIN"] # We'll just use one state for age range
+
+async def search_age_range_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the age range input and executes the search."""
     try:
-        context.user_data['search_prefs']['age_max'] = int(update.message.text)
+        age_min_str, age_max_str = update.message.text.split('-')
+        age_min = int(age_min_str.strip())
+        age_max = int(age_max_str.strip())
+        if age_min >= age_max or age_min < 13:
+            raise ValueError
+        context.user_data['search_prefs']['age_min'] = age_min
+        context.user_data['search_prefs']['age_max'] = age_max
     except ValueError:
-        await update.message.reply_text("Please enter a valid number for age.")
-        return states["SEARCH_AGE_MAX"]
+        await update.message.reply_text(
+            "Invalid format. Please use `min-max` (e.g., `18-25`).",
+            parse_mode='Markdown'
+        )
+        return states["SEARCH_AGE_MIN"] # Stay in the same state
 
     user_id = update.effective_user.id
     prefs = context.user_data.pop('search_prefs')

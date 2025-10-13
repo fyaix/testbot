@@ -121,6 +121,12 @@ class Database:
                 winners TEXT,
                 created_at INTEGER
             )''')
+
+            # Create indexes for faster queries
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_profiles_gender ON user_profiles(gender)")
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_profiles_age ON user_profiles(age)")
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_profiles_banned ON user_profiles(is_banned)")
+
         logger.info("Database initialized successfully.")
 
     def execute(self, query, params=()):

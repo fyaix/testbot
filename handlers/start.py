@@ -4,24 +4,24 @@ from database import db_instance as db
 from .keyboards import MAIN_MENU # We will create this file soon
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /start command."""
+    """Handles the /start command with improved user guidance."""
     user_id = update.effective_user.id
 
     if not db.is_profile_complete(user_id):
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Lengkapi Profil Sekarang", callback_data="complete_profile")],
-            [InlineKeyboardButton("Lanjutkan & Cari Acak", callback_data="skip_profile")]
+            [InlineKeyboardButton("🚀 Lengkapi Profil Sekarang", callback_data="start_profile_setup")],
         ])
         await update.message.reply_text(
             "👋 **Selamat datang di Anonymous Chat!**\n\n"
-            "Profilmu belum lengkap. Melengkapi profil akan memberikanmu pengalaman mencari partner yang lebih baik.",
-            reply_markup=keyboard
+            "Untuk pengalaman terbaik dan agar bisa menggunakan semua fitur, yuk lengkapi profilmu dulu. Hanya butuh beberapa saat!",
+            reply_markup=keyboard,
+            parse_mode='Markdown'
         )
         return
 
     await update.message.reply_text(
         "👋 **Selamat datang kembali!**\n\n"
-        "Gunakan menu di bawah atau ketik /help untuk melihat semua perintah yang tersedia.",
+        "Siap untuk mencari teman baru? Gunakan tombol di bawah untuk memulai.",
         reply_markup=MAIN_MENU
     )
 
@@ -55,13 +55,3 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     • `/adminstats`
     """
     await update.message.reply_text(help_text, reply_markup=MAIN_MENU)
-
-async def skip_profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles when user decides to skip profile completion."""
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text(
-        "Baik, Anda bisa mencari partner acak sekarang. "
-        "Jangan lupa untuk melengkapi profil nanti dengan perintah /profile.",
-        reply_markup=MAIN_MENU
-    )
