@@ -104,8 +104,8 @@ class Database:
             # Update session
             self.cursor.execute("""
             UPDATE sessions SET ended_at = ?
-            WHERE user1_id = ? AND user2_id = ? AND ended_at IS NULL
-            """, (datetime.now(), user_id, partner_id))
+            WHERE (user1_id = ? AND user2_id = ? OR user1_id = ? AND user2_id = ?) AND ended_at IS NULL
+            """, (datetime.now(), user_id, partner_id, partner_id, user_id))
             
             self.conn.commit()
             return partner_id
