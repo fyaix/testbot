@@ -126,8 +126,9 @@ def main() -> None:
     decorated_forward_message = auto_update_profile(check_ban_status(forward_message))
 
     # General message handler (must be last)
+    # Using the modern, class-based filters consistently
     application.add_handler(MessageHandler(
-        filters.TEXT | filters.PHOTO | filters.VIDEO | filters.VOICE | filters.Sticker(),
+        filters.Text() | filters.Photo() | filters.Video() | filters.Voice() | filters.Sticker(),
         decorated_forward_message
     ))
 
