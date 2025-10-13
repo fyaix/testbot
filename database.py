@@ -7,10 +7,10 @@ from config import DB_PATH
 logger = logging.getLogger(__name__)
 
 class Database:
-    def __init__(self):
+    def __init__(self, db_path=DB_PATH):
         """Initializes the database connection."""
         try:
-            self.conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+            self.conn = sqlite3.connect(db_path, check_same_thread=False)
             self.cursor = self.conn.cursor()
             self.init_db()
         except sqlite3.Error as e:
