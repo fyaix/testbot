@@ -20,7 +20,7 @@ from handlers.profile import (
 )
 from handlers.matching import (
     find_partner_command, search_pro_command, search_gender_step,
-    search_hobby_step, search_age_min_step, search_age_max_step,
+    search_hobby_step, search_age_range_step,
     next_command, stop_command
 )
 from handlers.admin import (
