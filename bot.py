@@ -36,32 +36,8 @@ from handlers.feedback import (
 from handlers.payment import (
     upgrade_command, precheckout_callback, successful_payment_callback
 )
-
-# --- Decorators (should be in a utils.py file, but here for simplicity for now) ---
-def auto_update_profile(func):
-    """Decorator to ensure user exists in DB and update username."""
-    async def wrapper(update, context, *args, **kwargs):
-        if update.effective_user:
-            db.ensure_user_exists(update.effective_user.id, update.effective_user.username)
-        return await func(update, context, *args, **kwargs)
-    return wrapper
-
-def check_ban_status(func):
-    """Decorator to check if a user is banned before executing a command."""
-    async def wrapper(update, context, *args, **kwargs):
-        banned_until = db.check_ban_status(update.effective_user.id)
-        if banned_until:
-            from datetime import datetime
-            await update.message.reply_text(f"🚫 You are banned until {datetime.fromtimestamp(banned_until).strftime('%Y-%m-%d %H:%M')}.")
-            return
-        return await func(update, context, *args, **kwargs)
-    return wrapper
-
-# --- Main Message Forwarder (Placeholder) ---
-async def forward_message(update, context):
-    """Handles forwarding messages between partners."""
-    # This logic needs to be fully implemented
-    await update.message.reply_text("You are not in a chat. Use /find to start one.")
+from handlers.chat import forward_message, secret_mode_command
+from utils.decorators import auto_update_profile, check_ban_status
 
 def main() -> None:
     """Sets up and runs the bot."""
@@ -117,6 +93,7 @@ def main() -> None:
     application.add_handler(CommandHandler("report", report_command))
     application.add_handler(CommandHandler("feedback", feedback_command))
     application.add_handler(CommandHandler("upgrade", upgrade_command))
+    application.add_handler(CommandHandler("secretmode", secret_mode_command))
     
     # Admin commands
     application.add_handler(CommandHandler("ban", ban_command))
@@ -135,8 +112,15 @@ def main() -> None:
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
 
+    # Decorated message handler
+    # This applies the decorators to the forward_message handler
+    decorated_forward_message = auto_update_profile(check_ban_status(forward_message))
+
     # General message handler (must be last)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_message))
+    application.add_handler(MessageHandler(
+        filters.TEXT | filters.PHOTO | filters.VIDEO | filters.VOICE | filters.STICKER,
+        decorated_forward_message
+    ))
 
     logger.info("Bot is starting...")
     application.run_polling()

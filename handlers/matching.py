@@ -75,10 +75,15 @@ async def search_age_max_step(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if partner_id:
         db.add_session(user_id, partner_id)
-        await context.bot.send_message(user_id, "✅ Partner found!", reply_markup=CHAT_MENU)
+        await context.bot.send_message(user_id, "✅ Partner found! Start chatting.", reply_markup=CHAT_MENU)
         await context.bot.send_message(partner_id, "✅ You have a new chat partner!", reply_markup=CHAT_MENU)
     else:
-        await update.message.reply_text("😔 No partners found with your criteria. Try widening your search.", reply_markup=MAIN_MENU)
+        await update.message.reply_text(
+            "😔 **No partners found with your specific criteria.**\n\n"
+            "You can try again, or use the regular `/find` command to search for any available partner.",
+            reply_markup=MAIN_MENU,
+            parse_mode='Markdown'
+        )
 
     return ConversationHandler.END
 

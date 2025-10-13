@@ -1,5 +1,7 @@
 import sqlite3
 import logging
+import time
+import random
 from config import DB_PATH
 
 logger = logging.getLogger(__name__)
@@ -310,6 +312,30 @@ class Database:
                 self.execute("UPDATE active_quizzes SET winners=? WHERE quiz_id=?", (','.join(winners), quiz_id))
                 return True
         return False
+
+    def grant_pro(self, user_id, days):
+        """Grants or extends a user's pro subscription."""
+        # Check current expiry
+        current_expiry = self.fetchone("SELECT pro_expires_at FROM user_profiles WHERE user_id=?", (user_id,))
+        start_time = int(time.time())
+        if current_expiry and current_expiry[0] and current_expiry[0] > start_time:
+            start_time = current_expiry[0]
+
+        new_expiry = start_time + days * 86400
+        self.execute("UPDATE user_profiles SET pro_expires_at=? WHERE user_id=?", (new_expiry, user_id))
+
+    def get_all_user_ids(self):
+        """Fetches all user IDs from the database."""
+        return [row[0] for row in self.fetchall("SELECT user_id FROM user_profiles")]
+
+    def get_stats(self):
+        """Gathers various statistics from the database."""
+        stats = {}
+        stats['total_users'] = self.fetchone("SELECT COUNT(*) FROM user_profiles")[0]
+        stats['active_chats'] = self.fetchone("SELECT COUNT(*)/2 FROM sessions")[0]
+        stats['pro_users'] = self.fetchone("SELECT COUNT(*) FROM user_profiles WHERE pro_expires_at > ?", (int(time.time()),))[0]
+        stats['reports_24h'] = self.fetchone("SELECT COUNT(*) FROM reports WHERE timestamp > ?", (int(time.time()) - 86400,))[0]
+        return stats
 
 # Create a single instance of the database to be used across the bot
 db_instance = Database()
