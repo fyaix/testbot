@@ -1,21 +1,35 @@
-# Token dari BotFather
-BOT_TOKEN = "8233233363:AAFOoRJLWLxmESJDB3Sl3owbw03CbVol468"
+import os
+from dotenv import load_dotenv
 
-# Supabase Config
-SUPABASE_URL = "https://yourproject.supabase.co"
-SUPABASE_KEY = "your-supabase-anon-key"
+# Muat variabel dari file .env
+load_dotenv()
+
+# Ambil token dari environment variables
+BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
+
+# Supabase Config (jika Anda menggunakannya)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 # Admin ID
-ADMIN_ID = 5361605327
+# Pastikan untuk mengubah string ke integer
+ADMIN_ID_STR = os.getenv("ADMIN_ID")
+try:
+    ADMIN_ID = int(ADMIN_ID_STR) if ADMIN_ID_STR else None
+except (ValueError, TypeError):
+    ADMIN_ID = None
 
-# Webhook URL (diisi setelah deploy)
-WEBHOOK_URL = ""
+# Webhook URL (untuk deployment)
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# Fitur Premium (opsional)
-PREMIUM_PRICE = "$2.99"
+# Konfigurasi Premium
+PREMIUM_PRICE = os.getenv("PREMIUM_PRICE", "Rp 49,000")
+PAYMENT_PROVIDER_TOKEN = os.getenv("YOUR_PAYMENT_PROVIDER_TOKEN")
+
+# Fitur-fitur yang akan ditampilkan
 PREMIUM_FEATURES = [
-    "✅ Media tanpa batas",
-    "✅ Matching pintar",
-    "✅ Prioritas pencarian",
-    "✅ Grup premium"
+    "✅ Pencarian Tanpa Batas",
+    "✅ Filter Gender & Minat",
+    "✅ Prioritas Pencarian",
+    "✅ Tanpa Iklan"
 ]
