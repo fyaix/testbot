@@ -126,9 +126,13 @@ def main() -> None:
     decorated_forward_message = auto_update_profile(check_ban_status(forward_message))
 
     # General message handler (must be last)
-    # Using the modern, class-based filters consistently
+    # We register two separate handlers to avoid mixing legacy and class-based filters
     application.add_handler(MessageHandler(
-        filters.Text() | filters.Photo() | filters.Video() | filters.Voice() | filters.Sticker(),
+        filters.TEXT | filters.PHOTO | filters.VIDEO | filters.VOICE,
+        decorated_forward_message
+    ))
+    application.add_handler(MessageHandler(
+        filters.Sticker(),
         decorated_forward_message
     ))
 
