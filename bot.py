@@ -13,7 +13,7 @@ from config import BOT_TOKEN, states
 from database import db_instance as db
 
 # Import handlers from modularized files
-from handlers.start import start_command, help_command, skip_profile_callback
+from handlers.start import start_command, help_command
 from handlers.profile import (
     profile_command, gender_step, age_step, bio_step,
     photo_step, hobby_step, cancel_profile
