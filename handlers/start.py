@@ -1,88 +1,67 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from database import db
-from config import PREMIUM_PRICE, PREMIUM_FEATURES
+from database import db_instance as db
+from .keyboards import MAIN_MENU # We will create this file soon
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the /start command and the 'Back to Menu' button."""
-    user = update.effective_user
-    db.add_user(user.id, user.username)
-
-    keyboard = [
-        [InlineKeyboardButton("🔍 Cari Pasangan", callback_data='search')],
-        [InlineKeyboardButton("💎 Premium", callback_data='premium')],
-        [InlineKeyboardButton("ℹ️ Bantuan", callback_data='help')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    text = (
-        f"👋 Halo {user.first_name}!\n\n"
-        "Selamat datang di Chat Anonim 1-on-1!\n\n"
-        "🔍 Tekan tombol di bawah untuk mencari pasangan obrolan."
-    )
-
-    if update.callback_query:
-        # If called from a button, edit the message
-        await update.callback_query.message.edit_text(text, reply_markup=reply_markup)
-    else:
-        # If called by /start command, send a new message
-        await update.message.reply_text(text, reply_markup=reply_markup)
-
-async def myprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the user's current profile settings."""
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the /start command."""
     user_id = update.effective_user.id
-    user = db.get_user(user_id)
 
-    if not user:
-        await update.message.reply_text("Silakan mulai bot dengan /start terlebih dahulu.")
+    if not db.is_profile_complete(user_id):
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Lengkapi Profil Sekarang", callback_data="complete_profile")],
+            [InlineKeyboardButton("Lanjutkan & Cari Acak", callback_data="skip_profile")]
+        ])
+        await update.message.reply_text(
+            "👋 **Selamat datang di Anonymous Chat!**\n\n"
+            "Profilmu belum lengkap. Melengkapi profil akan memberikanmu pengalaman mencari partner yang lebih baik.",
+            reply_markup=keyboard
+        )
         return
 
-    # Prepare status texts
-    premium_status = "✅ Aktif" if user.get('is_premium') else "❌ Tidak Aktif"
-    gender = user.get('gender', 'Belum diatur').title()
-    gender_preference = user.get('gender_preference', 'Siapa saja').title()
-    interests = user.get('interests', 'Belum diatur')
+    await update.message.reply_text(
+        "👋 **Selamat datang kembali!**\n\n"
+        "Gunakan menu di bawah atau ketik /help untuk melihat semua perintah yang tersedia.",
+        reply_markup=MAIN_MENU
+    )
 
-    # Format interests for better readability
-    if interests != 'Belum diatur':
-        interests = ", ".join([i.strip() for i in interests.split(',')])
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Displays the help message."""
+    help_text = """
+    📖 **Bantuan Bot Anonymous Chat** 📖
 
-    text = f"""
-👤 **Profil Anda**
+    **Perintah Utama:**
+    • `/start` - Memulai bot atau kembali ke menu utama.
+    • `/profile` - Mengatur atau memperbarui profil Anda (gender, usia, bio, foto, hobi).
+    • `/find` - Mencari partner chat secara acak.
+    • `/searchpro` - (Pro) Mencari partner dengan filter gender, hobi, dan usia.
+    • `/next` - Menghentikan chat saat ini dan mencari partner baru.
+    • `/stop` - Menghentikan chat saat ini.
 
-**Status Premium:** {premium_status}
-**Gender:** {gender}
-**Mencari:** {gender_preference}
-**Minat:** {interests}
+    **Fitur Tambahan:**
+    • `/playquiz` - Main kuis untuk mendapatkan poin atau akses Pro.
+    • `/redeem` - Tukar poin dengan hari Pro.
+    • `/joingroup` - Bergabung dengan grup chat anonim.
+    • `/report` - Melaporkan partner Anda saat ini.
+    • `/feedback` - Memberikan rating setelah sesi chat.
+    • `/poll` - Membuat polling di dalam chat atau grup.
+    • `/secretmode` - (Pro) Mengaktifkan mode pesan yang terhapus otomatis.
 
-Gunakan /settings untuk mengubah pengaturan ini.
-"""
-    await update.message.reply_text(text, parse_mode='Markdown')
+    **Perintah Admin (Owner Only):**
+    • `/ban <user_id> <durasi_hari>`
+    • `/unban <user_id>`
+    • `/grantpro <user_id> <durasi_hari>`
+    • `/broadcast <pesan>`
+    • `/adminstats`
+    """
+    await update.message.reply_text(help_text, reply_markup=MAIN_MENU)
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the /help command and the help button."""
-    help_text = f"""
-🔹 **Cara Penggunaan:**
-1. Tekan 🔍 Cari Pasangan
-2. Tunggu bot mencarikan pasangan
-3. Mulai chatting anonim!
-
-🔹 **Perintah:**
-/skip - Ganti pasangan
-/stop - Akhiri obrolan
-/report <alasan> - Laporkan pasangan
-/settings - Atur profil & preferensi
-/myprofile - Lihat profil Anda
-
-🔹 **Premium ({PREMIUM_PRICE}/bulan):**"""
-
-    for feature in PREMIUM_FEATURES:
-        help_text += f"\n{feature}"
-
-    help_text += "\n\n🔹 **Aturan:**\n- Hormati privasi orang lain\n- Tidak boleh spam\n- Tidak boleh mengirim konten ilegal"
-
-    # Check if this is from a callback query or a message
-    if update.callback_query:
-        await update.callback_query.message.reply_text(help_text, parse_mode='Markdown')
-    else:
-        await update.message.reply_text(help_text, parse_mode='Markdown')
+async def skip_profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles when user decides to skip profile completion."""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "Baik, Anda bisa mencari partner acak sekarang. "
+        "Jangan lupa untuk melengkapi profil nanti dengan perintah /profile.",
+        reply_markup=MAIN_MENU
+    )

@@ -1,87 +1,64 @@
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update
 from telegram.ext import ContextTypes
-from config import ADMIN_ID
-from database import db
+from database import db_instance as db
+from config import OWNER_ID
 
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the admin panel."""
-    if update.effective_user.id != ADMIN_ID:
-        return
+def owner_only(func):
+    """Decorator to restrict access to the owner."""
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        if update.effective_user.id != OWNER_ID:
+            await update.message.reply_text("❌ This command is for the bot owner only.")
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapper
 
-    keyboard = [
-        [InlineKeyboardButton("📊 Statistik", callback_data='admin_stats')],
-        [InlineKeyboardButton("🚨 Laporan", callback_data='admin_reports')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+@owner_only
+async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bans a user. Usage: /ban <user_id> <days>"""
+    try:
+        _, user_id_str, days_str = context.args
+        user_id = int(user_id_str)
+        days = int(days_str)
+        duration_seconds = days * 86400
+        db.ban_user(user_id, duration_seconds)
+        await update.message.reply_text(f"User {user_id} has been banned for {days} days.")
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /ban <user_id> <days>")
 
-    await update.message.reply_text(
-        "🔧 **Admin Panel**\n\nPilih aksi:",
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
+@owner_only
+async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unbans a user. Usage: /unban <user_id>"""
+    try:
+        user_id = int(context.args[0])
+        db.unban_user(user_id)
+        await update.message.reply_text(f"User {user_id} has been unbanned.")
+    except (IndexError, ValueError):
+        await update.message.reply_text("Usage: /unban <user_id>")
 
-async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Shows bot statistics to the admin."""
-    if update.effective_user.id != ADMIN_ID:
-        return
+@owner_only
+async def grant_pro_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Grants pro access to a user. Usage: /grantpro <user_id> <days>"""
+    # This would require a new DB method, let's assume it exists for now
+    # db.grant_pro(user_id, days)
+    await update.message.reply_text("This feature is not fully implemented yet.")
 
-    stats = db.get_stats()
+@owner_only
+async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Broadcasts a message to all users."""
+    # This requires getting all user IDs from the DB
+    # all_users = db.get_all_user_ids()
+    # message = " ".join(context.args)
+    # for user_id in all_users:
+    #     try:
+    #         await context.bot.send_message(user_id, message)
+    #     except Exception as e:
+    #         print(f"Failed to send broadcast to {user_id}: {e}")
+    await update.message.reply_text("This feature is not fully implemented yet.")
 
-    text = f"""📊 **STATISTIK BOT**
-
-👥 Total Pengguna: {stats['total_users']}
-💬 Pengguna Aktif (Chatting): {stats['active_users']}
-🔄 Total Sesi: {stats['total_sessions']}
-🚨 Total Laporan: {stats['total_reports']}"""
-
-    await update.callback_query.message.reply_text(text, parse_mode='Markdown')
-
-async def admin_reports(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Shows the latest reports to the admin."""
-    if update.effective_user.id != ADMIN_ID:
-        return
-
-    reports = db.get_reports(5)
-
-    if not reports:
-        await update.callback_query.message.reply_text("✅ Tidak ada laporan baru.")
-        return
-
-    text = "🚨 **DAFTAR LAPORAN TERBARU**\n\n"
-    for report in reports:
-        text += f"🆔 ID: {report[0]}\n"
-        text += f"👤 Pelapor: `{report[1]}`\n"
-        text += f"👤 Terlapor: `{report[2]}`\n"
-        text += f"📝 Alasan: {report[3]}\n"
-        text += f"⏰ Waktu: {report[4]}\n\n"
-
-    await update.callback_query.message.reply_text(text, parse_mode='Markdown')
-
-async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the /report command."""
-    user_id = update.effective_user.id
-    user_data = db.get_user_status(user_id)
-
-    if not user_data or user_data['status'] != 'chatting':
-        await update.message.reply_text("❌ Anda hanya bisa melaporkan saat sedang dalam obrolan.")
-        return
-
-    partner_id = user_data['partner_id']
-    if not partner_id:
-        await update.message.reply_text("❌ Pasangan tidak ditemukan.")
-        return
-
-    reason = " ".join(context.args) if context.args else "Tidak ada alasan yang diberikan"
-
-    db.add_report(user_id, partner_id, reason)
-
-    await context.bot.send_message(
-        chat_id=ADMIN_ID,
-        text=f"🚨 **LAPORAN BARU** 🚨\n"
-             f"**Pelapor:** `{user_id}`\n"
-             f"**Terlapor:** `{partner_id}`\n"
-             f"**Alasan:** {reason}",
-        parse_mode='Markdown'
-    )
-
-    await update.message.reply_text("✅ Laporan Anda telah kami terima. Tim kami akan meninjaunya. Terima kasih.")
+@owner_only
+async def admin_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Shows bot statistics."""
+    # This would require a new DB method to get stats
+    # stats = db.get_stats()
+    # await update.message.reply_text(f"Bot Stats:\n- Total Users: {stats['total_users']}\n- Active Chats: {stats['active_chats']}")
+    await update.message.reply_text("This feature is not fully implemented yet.")

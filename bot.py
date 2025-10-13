@@ -1,159 +1,145 @@
 import logging
-import os
-from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
-    PreCheckoutQueryHandler,
+    ConversationHandler,
     filters,
-    ContextTypes
+    PreCheckoutQueryHandler,
 )
 
-from config import BOT_TOKEN, WEBHOOK_URL
-from database import db
+from config import BOT_TOKEN, states
+from database import db_instance as db
 
-# Import handlers from the new modules
-from handlers.start import start_command, help_command
+# Import handlers from modularized files
+from handlers.start import start_command, help_command, skip_profile_callback
+from handlers.profile import (
+    profile_command, gender_step, age_step, bio_step,
+    photo_step, hobby_step, cancel_profile
+)
 from handlers.matching import (
-    search_partner,
-    handle_message,
-    skip_command,
-    stop_command
+    find_partner_command, search_pro_command, search_gender_step,
+    search_hobby_step, search_age_min_step, search_age_max_step,
+    next_command, stop_command
 )
-from handlers.admin import admin_panel, admin_stats, admin_reports, report_command
-from handlers.premium import (
-    premium_info,
-    send_invoice,
-    precheckout_callback,
-    successful_payment_callback
+from handlers.admin import (
+    ban_command, unban_command, grant_pro_command,
+    broadcast_command, admin_stats_command
 )
-from handlers.settings import (
-    settings_command,
-    set_gender_start, set_gender_save,
-    set_gender_pref_start, set_gender_pref_save,
-    set_interests_start, set_interests_save,
-    cancel_settings,
-    GENDER, GENDER_PREFERENCE, INTERESTS
+from handlers.quiz import (
+    play_quiz_command, answer_quiz_command, quiz_reward_callback
+)
+from handlers.feedback import (
+    report_command, report_callback, feedback_command, feedback_callback as fb_callback
+)
+from handlers.payment import (
+    upgrade_command, precheckout_callback, successful_payment_callback
 )
 
-# Logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+# --- Decorators (should be in a utils.py file, but here for simplicity for now) ---
+def auto_update_profile(func):
+    """Decorator to ensure user exists in DB and update username."""
+    async def wrapper(update, context, *args, **kwargs):
+        if update.effective_user:
+            db.ensure_user_exists(update.effective_user.id, update.effective_user.username)
+        return await func(update, context, *args, **kwargs)
+    return wrapper
 
-# ======================
-# BUTTON HANDLER
-# ======================
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Parses the CallbackQuery and runs the appropriate handler."""
-    query = update.callback_query
-    await query.answer()  # Acknowledge the button press
-    
-    # Route the callback data to the correct function
-    if query.data == 'search':
-        await search_partner(update, context)
-    elif query.data == 'help':
-        await help_command(update, context)
-    elif query.data == 'premium':
-        await premium_info(update, context)
-    elif query.data == 'upgrade_premium':
-        await send_invoice(update, context)
-    elif query.data == 'start_menu':
-        await start_command(update, context)
-    
-    # Admin callbacks
-    elif query.data == 'admin_stats':
-        await admin_stats(update, context)
-    elif query.data == 'admin_reports':
-        await admin_reports(update, context)
+def check_ban_status(func):
+    """Decorator to check if a user is banned before executing a command."""
+    async def wrapper(update, context, *args, **kwargs):
+        banned_until = db.check_ban_status(update.effective_user.id)
+        if banned_until:
+            from datetime import datetime
+            await update.message.reply_text(f"🚫 You are banned until {datetime.fromtimestamp(banned_until).strftime('%Y-%m-%d %H:%M')}.")
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapper
 
+# --- Main Message Forwarder (Placeholder) ---
+async def forward_message(update, context):
+    """Handles forwarding messages between partners."""
+    # This logic needs to be fully implemented
+    await update.message.reply_text("You are not in a chat. Use /find to start one.")
 
-# ======================
-# MAIN FUNCTION
-# ======================
 def main() -> None:
-    """Start the bot."""
+    """Sets up and runs the bot."""
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    if not BOT_TOKEN:
+        logger.error("FATAL: BOT_TOKEN is not configured. Exiting.")
+        return
+
     application = Application.builder().token(BOT_TOKEN).build()
 
-    # Register basic command handlers
-    from handlers.start import myprofile_command
+    # --- Conversation Handlers ---
+    profile_conv = ConversationHandler(
+        entry_points=[CommandHandler("profile", profile_command)],
+        states={
+            states["PROFILE_GENDER"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, gender_step)],
+            states["PROFILE_AGE"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, age_step)],
+            states["PROFILE_BIO"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, bio_step)],
+            states["PROFILE_PHOTO"]: [MessageHandler(filters.PHOTO, photo_step)],
+            states["PROFILE_HOBBY"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, hobby_step)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_profile)],
+    )
+
+    search_pro_conv = ConversationHandler(
+        entry_points=[CommandHandler("searchpro", search_pro_command)],
+        states={
+            states["SEARCH_GENDER"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, search_gender_step)],
+            states["SEARCH_HOBBY"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, search_hobby_step)],
+            states["SEARCH_AGE_MIN"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, search_age_min_step)],
+            states["SEARCH_AGE_MAX"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, search_age_max_step)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_profile)], # Can reuse cancel
+    )
+
+    # --- Registering Handlers ---
+    application.add_handler(profile_conv)
+    application.add_handler(search_pro_conv)
+
+    # Basic commands
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("settings", settings_command))
-    application.add_handler(CommandHandler("myprofile", myprofile_command))
 
-    # Register matching and chat control handlers
-    application.add_handler(CommandHandler("skip", skip_command))
+    # Matching commands
+    application.add_handler(CommandHandler("find", find_partner_command))
+    application.add_handler(CommandHandler("next", next_command))
     application.add_handler(CommandHandler("stop", stop_command))
 
-    # Register admin handlers
-    application.add_handler(CommandHandler("admin", admin_panel))
+    # Feature commands
+    application.add_handler(CommandHandler("playquiz", play_quiz_command))
+    application.add_handler(CommandHandler("answer", answer_quiz_command))
     application.add_handler(CommandHandler("report", report_command))
-
-    # Settings conversation handler
-    settings_conv_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(set_gender_start, pattern='^set_gender$'),
-                      CallbackQueryHandler(set_gender_pref_start, pattern='^set_gender_pref$'),
-                      CallbackQueryHandler(set_interests_start, pattern='^set_interests$')],
-        states={
-            GENDER: [CallbackQueryHandler(set_gender_save, pattern='^gender_')],
-            GENDER_PREFERENCE: [CallbackQueryHandler(set_gender_pref_save, pattern='^pref_')],
-            INTERESTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_interests_save)],
-        },
-        fallbacks=[CallbackQueryHandler(cancel_settings, pattern='^cancel_settings$'),
-                   CommandHandler('cancel', cancel_settings)],
-        map_to_parent={
-            # End of conversation -> back to main button handler
-            ConversationHandler.END: ConversationHandler.END,
-        }
-    )
+    application.add_handler(CommandHandler("feedback", feedback_command))
+    application.add_handler(CommandHandler("upgrade", upgrade_command))
     
-    # Register payment handlers
+    # Admin commands
+    application.add_handler(CommandHandler("ban", ban_command))
+    application.add_handler(CommandHandler("unban", unban_command))
+    application.add_handler(CommandHandler("grantpro", grant_pro_command))
+    application.add_handler(CommandHandler("broadcast", broadcast_command))
+    application.add_handler(CommandHandler("adminstats", admin_stats_command))
+
+    # Callback Query Handlers
+    application.add_handler(CallbackQueryHandler(skip_profile_callback, pattern="^skip_profile$"))
+    application.add_handler(CallbackQueryHandler(report_callback, pattern=r"^(report_|block_)"))
+    application.add_handler(CallbackQueryHandler(fb_callback, pattern=r"^fb_"))
+    application.add_handler(CallbackQueryHandler(quiz_reward_callback, pattern=r"^quiz(pro|poin)_"))
+
+    # Payment Handlers
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
-    
-    # The main button handler now needs to include the settings conversation
-    main_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start_command)],
-        states={
-            ConversationHandler.END: [
-                CallbackQueryHandler(button_callback),
-                settings_conv_handler
-            ]
-        },
-        fallbacks=[CommandHandler('start', start_command)]
-    )
 
-    # The main handler that routes all callbacks and commands.
-    # It uses the ConversationHandler for the settings menu.
-    application.add_handler(settings_conv_handler)
-    application.add_handler(CallbackQueryHandler(button_callback))
-    
-    # Register the main message handler for chatting
-    # It handles non-command text messages
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # General message handler (must be last)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_message))
 
-    # Run the bot
-    if WEBHOOK_URL:
-        # Production mode (Vercel, etc.)
-        # A more robust way to create a unique URL path
-        url_path = BOT_TOKEN.split(':', 1)[-1].replace('/', '_')
-
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=int(os.environ.get("PORT", 8443)),
-            url_path=url_path,
-            webhook_url=f"{WEBHOOK_URL}/{url_path}"
-        )
-        logger.info(f"Webhook set to {WEBHOOK_URL}")
-    else:
-        # Development mode
-        logger.info("Starting bot in polling mode...")
-        application.run_polling()
+    logger.info("Bot is starting...")
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
