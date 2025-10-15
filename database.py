@@ -34,7 +34,9 @@ class Database:
                 is_banned INTEGER DEFAULT 0,
                 banned_until INTEGER DEFAULT 0,
                 hobbies TEXT,
-                points INTEGER DEFAULT 0
+                points INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'idle',
+                proposed_to INTEGER
             )''')
 
             # Reports Table
@@ -53,17 +55,6 @@ class Database:
                 user_id INTEGER,
                 blocked_id INTEGER,
                 PRIMARY KEY(user_id, blocked_id)
-            )''')
-
-            # Chat Queue (can be removed if find_partner is efficient enough)
-            self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS chat_queue (
-                user_id INTEGER PRIMARY KEY,
-                gender_pref TEXT,
-                hobby_pref TEXT,
-                age_min INTEGER,
-                age_max INTEGER,
-                is_pro INTEGER DEFAULT 0
             )''')
 
             # Chat Sessions Table
@@ -196,8 +187,7 @@ class Database:
         query = """
             SELECT u.user_id, u.hobbies
             FROM user_profiles u
-            LEFT JOIN sessions s ON u.user_id = s.user_id
-            WHERE u.user_id != ? AND s.user_id IS NULL AND u.is_banned = 0
+            WHERE u.user_id != ? AND u.status = 'searching' AND u.is_banned = 0
         """
         params = [user_id]
 
@@ -342,6 +332,17 @@ class Database:
         stats['pro_users'] = self.fetchone("SELECT COUNT(*) FROM user_profiles WHERE pro_expires_at > ?", (int(time.time()),))[0]
         stats['reports_24h'] = self.fetchone("SELECT COUNT(*) FROM reports WHERE timestamp > ?", (int(time.time()) - 86400,))[0]
         return stats
+
+    def get_user_status(self, user_id):
+        """Retrieves the current status and proposed_to ID for a user."""
+        row = self.fetchone("SELECT status, proposed_to FROM user_profiles WHERE user_id=?", (user_id,))
+        if row:
+            return {"status": row[0], "proposed_to": row[1]}
+        return None
+
+    def set_user_status(self, user_id, status, proposed_to=None):
+        """Sets a user's status and their proposed_to ID."""
+        self.execute("UPDATE user_profiles SET status=?, proposed_to=? WHERE user_id=?", (status, proposed_to, user_id))
 
 # Create a single instance of the database to be used across the bot
 db_instance = Database()

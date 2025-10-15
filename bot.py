@@ -20,7 +20,7 @@ from handlers.profile import (
 )
 from handlers.matching import (
     find_partner_command, search_pro_command, search_gender_step,
-    search_hobby_step, search_age_range_step,
+    search_hobby_step, search_age_range_step, proposal_callback,
     next_command, stop_command
 )
 from handlers.admin import (
@@ -113,6 +113,7 @@ def main() -> None:
 
     # Callback Query Handlers
     application.add_handler(CallbackQueryHandler(profile_command, pattern="^start_profile_setup$"))
+    application.add_handler(CallbackQueryHandler(proposal_callback, pattern=r"^proposal_"))
     application.add_handler(CallbackQueryHandler(report_callback, pattern=r"^(report_|block_)"))
     application.add_handler(CallbackQueryHandler(fb_callback, pattern=r"^fb_"))
     application.add_handler(CallbackQueryHandler(quiz_reward_callback, pattern=r"^quiz(pro|poin)_"))
