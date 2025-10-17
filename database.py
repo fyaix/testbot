@@ -83,14 +83,6 @@ class Database:
         self.cursor.execute(query, params)
         return [row[0] for row in self.cursor.fetchall()]
 
-    def add_session(self, user1_id, user2_id):
-        """Logs a new chat session."""
-        self.cursor.execute(
-            "INSERT INTO sessions (user1_id, user2_id, started_at) VALUES (?, ?, ?)",
-            (user1_id, user2_id, datetime.now())
-        )
-        self.conn.commit()
-
     def end_chat(self, user_id):
         user_data = self.get_user_status(user_id)
         if not user_data:

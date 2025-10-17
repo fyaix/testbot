@@ -13,7 +13,6 @@ from telegram.ext import (
 )
 from config import BOT_TOKEN, ADMIN_ID, WEBHOOK_URL, PREMIUM_PRICE, PREMIUM_FEATURES
 from database import db
-
 # Logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -107,7 +106,13 @@ async def search_partner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Update statuses and create session
         db.set_user_status(user_id, 'chatting', partner_id)
         db.set_user_status(partner_id, 'chatting', user_id)
-        db.add_session(user_id, partner_id)
+
+        # Log the session
+        db.cursor.execute(
+            "INSERT INTO sessions (user1_id, user2_id, started_at) VALUES (?, ?, ?)",
+            (user_id, partner_id, datetime.now())
+        )
+        db.conn.commit()
 
         # Notify both users
         success_message = "✅ Pasangan ditemukan! Silakan mulai chatting."
